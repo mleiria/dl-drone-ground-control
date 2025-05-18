@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Real-time Chart with D3.js</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        .chart-container {
+            width: 800px;
+            height: 400px;
+        }
+        .line {
+            fill: none;
+            stroke: steelblue;
+            stroke-width: 2px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="chart-container" id="chart"></div>
+
+<script th:inline="javascript">
+    const chartWidth = 400;
+    const chartHeight = 200;
+    const margin = { top: 20, right: 20, bottom: 30, left: 50 };
+    const width = chartWidth - margin.left - margin.right;
+    const height = chartHeight - margin.top - margin.bottom;
+
+    const svg = d3.select("#chart")
+        .append("svg")
+        .attr("width", chartWidth)
+        .attr("height", chartHeight)
+        .append("g")
+        .attr("transform", `translate(${margin.left},${margin.top})`);
+
+    const xScale = d3.scaleTime().range([0, width]);
+    const yScale = d3.scaleLinear().range([height, 0]);
+
+    const line = d3.line()
+        .x(d => xScale(d.timestamp))
+        .y(d => yScale(d.value));
+
+    svg.append("path")
+        .datum([]) // Start with empty data
+        .attr("class", "line");
+
+    const xAxis = svg.append("g")
+        .attr("transform", `translate(0,${height})`)
+        .call(d3.axisBottom(xScale));
+
+    const yAxis = svg.append("g")
+        .call(d3.axisLeft(yScale));
+
+    const eventSource = new EventSource(/*[[@{/api/chart-data}]]*/ '/api/chart-data'); // Thymeleaf URL
+
+    const data = [];
+
+    eventSource.onmessage = (event) => {
+        const dataPoint = JSON.parse(event.data);
+        dataPoint.timestamp = new Date(dataPoint.timestamp); // Convert to Date object
+
+        data.push(dataPoint);
+
+        // Update scales
+        xScale.domain(d3.extent(data, d => d.timestamp));
+        yScale.domain([0, d3.max(data, d => d.value)]); // Assuming positive values
+
+        // Redraw the line
+        svg.select(".line")
+            .datum(data)
+            .attr("d", line);
+
+        // Update axes
+        xAxis.call(d3.axisBottom(xScale));
+        yAxis.call(d3.axisLeft(yScale));
+    };
+
+
+</script>
+
+</body>
+</html>

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <title>DL Ground Control Station</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+    <link rel="stylesheet" type="text/css" media="all" href="../static/css/gtvg.css" th:href="@{/css/gtvg.css}"/>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+
+        .button-container {
+            display: flex; /* Use flexbox for horizontal alignment */
+            justify-content: center; /* Center the buttons horizontally */
+            gap: 10px; /* Add some spacing between buttons */
+        }
+
+        .chart-container {
+            display: flex;
+            justify-content: center; /* Center charts horizontally */
+            gap: 20px; /* Space between charts */
+            margin-top: 20px; /* Space above charts */
+            width: 800px;
+            height: 400px;
+        }
+
+        .line {
+            fill: none;
+            stroke: steelblue;
+            stroke-width: 2px;
+        }
+    </style>
+    <script>
+        function handleTakeoff() {
+            fetch('/api/cmd',
+                {
+                    method: 'POST',
+                    body: JSON.stringify({actionVo: 'takeoff', params: {altitude: 10}}), // Adjust the params as needed
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Res Success:', data); // Handle the response data
+                    // Update the UI or perform other actions based on the response
+                })
+                .catch((error) => {
+                    console.error('Res Error:', error); // Handle errors
+                });
+        }
+    </script>
+
+</head>
+
+<body>
+<div class="button-container">
+    <button onclick="handleTakeoff()">Takeoff</button>
+    <button>Button 2</button>
+    <button>Button 3</button>
+    <button>Button 4</button>
+</div>
+<div class="chart-container">
+    <div id="chartTakeoff"></div>
+    <div id="chartFlight"></div>
+</div>
+<script th:inline="javascript">
+    const chartWidthTakeoff = 400;
+    const chartHeightTakeoff = 200;
+    const marginTakeoff = {top: 20, right: 20, bottom: 30, left: 50};
+    const widthTakeoff = chartWidthTakeoff - marginTakeoff.left - marginTakeoff.right;
+    const heightTakeoff = chartHeightTakeoff - marginTakeoff.top - marginTakeoff.bottom;
+
+    const svgTakeoff = d3.select("#chartTakeoff")
+        .append("svg")
+        .attr("width", chartWidthTakeoff)
+        .attr("height", chartHeightTakeoff)
+        .append("g")
+        .attr("transform", `translate(${marginTakeoff.left},${marginTakeoff.top})`);
+
+    const xScaleTakeoff = d3.scaleTime().range([0, widthTakeoff]);
+    const yScaleTakeoff = d3.scaleLinear().range([heightTakeoff, 0]);
+
+    const lineTakeoff = d3.line()
+        .x(d => xScaleTakeoff(d.timestamp))
+        .y(d => yScaleTakeoff(d.value));
+
+    svgTakeoff.append("path")
+        .datum([]) // Start with empty data
+        .attr("class", "line");
+
+    const xAxisTakeoff = svgTakeoff.append("g")
+        .attr("transform", `translate(0,${heightTakeoff})`)
+        .call(d3.axisBottom(xScaleTakeoff));
+
+    const yAxisTakeoff = svgTakeoff.append("g")
+        .call(d3.axisLeft(yScaleTakeoff));
+
+    const eventSourceTakeoff = new EventSource(/*[[@{/api/chart-data}]]*/ '/api/chart-data'); // Thymeleaf URL
+
+    const dataTakeoff = [];
+
+    eventSourceTakeoff.onmessage = (event) => {
+        const dataPoint = JSON.parse(event.data);
+        dataPoint.timestamp = new Date(dataPoint.timestamp); // Convert to Date object
+
+        dataTakeoff.push(dataPoint);
+
+        // Update scales
+        xScaleTakeoff.domain(d3.extent(dataTakeoff, d => d.timestamp));
+        yScaleTakeoff.domain([0, d3.max(dataTakeoff, d => d.value)]); // Assuming positive values
+
+        // Redraw the line
+        svgTakeoff.select(".line")
+            .datum(dataTakeoff)
+            .attr("d", lineTakeoff);
+
+        // Update axes
+        xAxisTakeoff.call(d3.axisBottom(xScaleTakeoff));
+        yAxisTakeoff.call(d3.axisLeft(yScaleTakeoff));
+    };
+
+
+</script>
+
+
+<script th:inline="javascript">
+    const chartWidthFlight = 400;
+    const chartHeightFlight = 200;
+    const marginFlight = {top: 20, right: 20, bottom: 30, left: 50};
+    const widthFlight = chartWidthFlight - marginFlight.left - marginFlight.right;
+    const heightFlight = chartHeightFlight - marginFlight.top - marginFlight.bottom;
+
+    const svgFlight = d3.select("#chartFlight")
+        .append("svg")
+        .attr("width", chartWidthFlight)
+        .attr("height", chartHeightFlight)
+        .append("g")
+        .attr("transform", `translate(${marginFlight.left},${marginFlight.top})`);
+
+    const xScaleFlight = d3.scaleTime().range([0, widthFlight]);
+    const yScaleFlight = d3.scaleLinear().range([heightFlight, 0]);
+
+    const lineFlight = d3.line()
+        .x(d => xScaleFlight(d.timestamp))
+        .y(d => yScaleFlight(d.value));
+
+    svgFlight.append("path")
+        .datum([]) // Start with empty data
+        .attr("class", "line");
+
+    const xAxisFlight = svgFlight.append("g")
+        .attr("transform", `translate(0,${heightFlight})`)
+        .call(d3.axisBottom(xScaleFlight));
+
+    const yAxisFlight = svgFlight.append("g")
+        .call(d3.axisLeft(yScaleFlight));
+
+    const eventSourceFlight = new EventSource(/*[[@{/api/chart-data}]]*/ '/api/chart-data'); // Thymeleaf URL
+
+    const dataFlight = [];
+
+    eventSourceFlight.onmessage = (event) => {
+        const dataPoint = JSON.parse(event.data);
+        dataPoint.timestamp = new Date(dataPoint.timestamp); // Convert to Date object
+
+        dataFlight.push(dataPoint);
+
+        // Update scales
+        xScaleFlight.domain(d3.extent(dataFlight, d => d.timestamp));
+        yScaleFlight.domain([0, d3.max(dataFlight, d => d.value)]); // Assuming positive values
+
+        // Redraw the line
+        svgFlight.select(".line")
+            .datum(dataFlight)
+            .attr("d", lineFlight);
+
+        // Update axes
+        xAxisFlight.call(d3.axisBottom(xScaleFlight));
+        yAxisFlight.call(d3.axisLeft(yScaleFlight));
+    };
+
+
+</script>
+
+
+<div th:insert="~{footer::copy}">&copy; 2011 The Static Templates</div>
+
+</body>
+
+</html>
+
